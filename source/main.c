@@ -10,6 +10,7 @@
 #define CLEAR_COLOR 0x555555FF
 
 C3D_Tex fade_tex;
+C3D_Tex bg_tex;
 static Pixel* fadePixels;
 static Bitmap fadeBitmap;
 float fadeVal;
@@ -26,10 +27,15 @@ u32 music_bin_size;
 #define min(a, b) (((a)<(b))?(a):(b))
 #define max(a, b) (((a)>(b))?(a):(b))
 
-#define AUDIO_BUFSIZE 512
+#define OGG_IMPL
+#define VORBIS_IMPL
+#include "minivorbis.h"
+
 #define AUDIO_BLOCKSIZE 16384
 
-#define SONG_BPM 129.0
+#define CHANNELS 2
+#define AUDIO_BUFSIZE (512 * CHANNELS)
+#define SONG_BPM 127.0
 #define SONG_BPS (SONG_BPM / 60.0)
 #define SONG_SPS 32000
 #define SONG_SPB (SONG_SPS / SONG_BPS)
@@ -37,13 +43,19 @@ u32 music_bin_size;
 #define ROWS_PER_BEAT 8
 #define SAMPLES_PER_ROW (SONG_SPB / ROWS_PER_BEAT)
 
+#ifdef SYNC_PLAYER
+#define SYNC_OFFSET_SEC 0.35
+#else
+#define SYNC_OFFSET_SEC 0.0
+#endif
+
 int32_t sample_pos = 0;
 ndspWaveBuf wave_buffer[2];
 uint8_t fill_buffer = 0;
 uint8_t audio_playing = 1;
 
 double audio_get_row() {
-    return (double)sample_pos / (double)SAMPLES_PER_ROW;
+    return (double)(sample_pos + SYNC_OFFSET_SEC * SONG_SPS) / ((double)SAMPLES_PER_ROW * (double)CHANNELS);
 }
 
 // #define DEV_MODE
@@ -70,10 +82,10 @@ struct sync_cb rocket_callbakcks = {
 };
 #endif
 
-// #define ROCKET_HOST "192.168.56.1"
-// #define ROCKET_HOST "192.168.1.129"
+//#define ROCKET_HOST "192.168.56.1"
+#define ROCKET_HOST "192.168.1.129"
 // #define ROCKET_HOST "127.0.0.1"
-#define ROCKET_HOST "192.168.10.129"
+// #define ROCKET_HOST "192.168.10.129"
 
 #define SOC_ALIGN 0x1000
 #define SOC_BUFFERSIZE 0x100000
@@ -170,7 +182,7 @@ void loadTexCache2(C3D_Tex* tex, C3D_TexCube* cube, const char* path) {
     // Delete the t3x object since we don't need it
     Tex3DS_TextureFree(t3x);
 
-    printf("Free linear memory after tex load: %d\n", linearSpaceFree());
+    // printf("Free linear memory after tex load: %d\n", linearSpaceFree());
 }
 
 // Texture loading: Linear to VRAM
@@ -183,12 +195,13 @@ void texToVRAM2(C3D_Tex* linear, C3D_Tex* vram) {
     }
 }
 
-C3D_Tex scrollImgs[8];
+C3D_Tex scrollImgs[2];
 int vramScrollImg = -1;
 
 int main() {
     bool DUMPFRAMES = false;
     bool DUMPFRAMES_3D = false;
+    float DUMPFRAMES_3D_SEP = 0.4;
 
     // Initialize graphics
     gfxInit(GSP_RGBA8_OES, GSP_BGR8_OES, false);
@@ -205,8 +218,51 @@ int main() {
     romfsInit();
     
     // Open music
-    music_bin = readFileMem("romfs:/music.bin", &music_bin_size, false);
-    
+    // old and busted: just plain wave file
+    /*music_bin = readFileMem("romfs:/music.bin", &music_bin_size, false);*/
+
+    // new and lukewarm: predecode an ogg file. saves file size, but precalc sucks.
+    // TODO: Convert this to streaming the data in as needed
+    music_bin_size = 0;
+    FILE* fp = fopen("romfs:/music.ogg", "rb");
+    OggVorbis_File vorbis;
+    if(ov_open_callbacks(fp, &vorbis, NULL, 0, OV_CALLBACKS_DEFAULT) != 0) {
+        printf("music.ogg invalid.");
+        return -1;
+    }
+
+    // Figure out how many bytes of audio we have
+    unsigned char buf[4096];
+    printf("Preloading, please wait...\n");
+    printf("This can take a while, especially on an old 3DS, sorry.\n");
+    while(1) {
+        int section = 0;
+        long bytes = ov_read(&vorbis, buf, sizeof(buf), 0, 2, 1, &section);
+        if(bytes <= 0)
+            break;
+        music_bin_size += bytes;
+    }
+    music_bin = (u8*)malloc((1 + music_bin_size)*sizeof(u8));
+    vorbis_info* info = ov_info(&vorbis, -1);    
+    // printf("Ogg file %d Hz, %d channels, %d kbit/s, total audio data %d bytes.\n", info->rate, info->channels, info->bitrate_nominal / 1024, music_bin_size);
+
+    // Reopen and read properly
+    ov_clear(&vorbis);
+    fclose(fp);
+    fp = fopen("romfs:/music.ogg", "rb");
+    ov_open_callbacks(fp, &vorbis, NULL, 0, OV_CALLBACKS_DEFAULT);
+    int readBytes = 0;
+    while(readBytes < music_bin_size) {
+        int section = 0;
+        long bytes = ov_read(&vorbis, &music_bin[readBytes], music_bin_size, 0, 2, 1, &section);
+        readBytes += bytes;
+    }
+    ov_clear(&vorbis);
+    fclose(fp);
+    // printf("Read %d bytes of audio data to buffer at %x.", readBytes, music_bin);
+
+    printf("Demobeginn imminent.\n");
+
     // Rocket startup
 #ifndef SYNC_PLAYER
     printf("Now socketing...\n");
@@ -245,7 +301,7 @@ int main() {
 
     ndspChnSetInterp(0, NDSP_INTERP_LINEAR);
     ndspChnSetRate(0, SONG_SPS);
-    ndspChnSetFormat(0, NDSP_FORMAT_MONO_PCM16);
+    ndspChnSetFormat(0, NDSP_FORMAT_STEREO_PCM16);
     
     float mix[12];
     memset(mix, 0, sizeof(mix));
@@ -256,9 +312,9 @@ int main() {
     uint8_t *audio_buffer = (uint8_t*)linearAlloc(AUDIO_BUFSIZE * sizeof(int16_t) * 2);
     memset(wave_buffer,0,sizeof(wave_buffer));
     wave_buffer[0].data_vaddr = &audio_buffer[0];
-    wave_buffer[0].nsamples = AUDIO_BUFSIZE;
+    wave_buffer[0].nsamples = AUDIO_BUFSIZE / CHANNELS;
     wave_buffer[1].data_vaddr = &audio_buffer[AUDIO_BUFSIZE * sizeof(int16_t)];
-    wave_buffer[1].nsamples = AUDIO_BUFSIZE;
+    wave_buffer[1].nsamples = AUDIO_BUFSIZE / CHANNELS;
     
     // Get first row value
     double row = 0.0;  
@@ -275,13 +331,9 @@ int main() {
     // Load scroll textures
     loadTexCache2(&scrollImgs[0], NULL, "romfs:/tex_scroll1.bin");
     loadTexCache2(&scrollImgs[1], NULL, "romfs:/tex_scroll2.bin");
-    loadTexCache2(&scrollImgs[2], NULL, "romfs:/tex_scroll3.bin");
-    loadTexCache2(&scrollImgs[3], NULL, "romfs:/tex_scroll4.bin");
-    loadTexCache2(&scrollImgs[4], NULL, "romfs:/tex_scroll5.bin");
-    loadTexCache2(&scrollImgs[5], NULL, "romfs:/tex_scroll6.bin");
-    loadTexCache2(&scrollImgs[6], NULL, "romfs:/tex_scroll7.bin");
-    loadTexCache2(&scrollImgs[7], NULL, "romfs:/tex_scroll8.bin");
     texToVRAM2(&scrollImgs[0], &fade_tex);
+    texToVRAM2(&scrollImgs[1], &bg_tex);
+    C3D_TexSetFilter(&bg_tex, GPU_LINEAR, GPU_LINEAR);
 
     // Set up effect code
     effectTunnelInit();
@@ -321,7 +373,7 @@ int main() {
         int whichImg = sync_get_val(sync_img, row);
         whichImg = min(whichImg, 7);
         if(whichImg != vramScrollImg) {
-            printf("Attempting load of tex: %d\n", whichImg);
+            //printf("Attempting load of tex: %d\n", whichImg);
             C3D_TexDelete(&fade_tex);
             texToVRAM2(&scrollImgs[whichImg], &fade_tex);
             vramScrollImg = whichImg;
@@ -337,6 +389,10 @@ int main() {
             break; // break in order to return to hbmenu
         }  
         float slider = osGet3DSliderState();
+        if(DUMPFRAMES_3D) {
+            slider = DUMPFRAMES_3D_SEP;
+        }
+
         float iod = slider / 3.0;
 
         effectTunnelDraw(targetLeft, targetRight, row, iod);
@@ -357,7 +413,7 @@ int main() {
             else if(fc < 3000) {
                 sprintf(fname, "3ds/dump3/fb_left_%08d.raw", fc);
             }
-            else if(fc < 4000) {
+            else {
                 sprintf(fname, "3ds/dump4/fb_left_%08d.raw", fc);
             }
             FILE* file = fopen(fname,"w");
@@ -376,7 +432,7 @@ int main() {
                 else if(fc < 3000) {
                     sprintf(fname, "3ds/dump3/fb_right_%08d.raw", fc);
                 }
-                else if(fc < 4000) {
+                else {
                     sprintf(fname, "3ds/dump4/fb_right_%08d.raw", fc);
                 }
                 file = fopen(fname,"w");
@@ -385,8 +441,12 @@ int main() {
                 fclose(file);
             }
         }
-        
+
         fc++;
+
+        if(fc == 3900) {
+            break;
+        }
         //gspWaitForPPF();
         //printf("Got to next loop ---------------- \n");
     }

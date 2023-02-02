@@ -34,6 +34,8 @@
 .alias  half  myconst.wwww
 .alias  homo  myconst.xxxy ; yes homo
 
+.constf texstretch(0.25, 0.25, -0.5, -0.5)
+
 ; Outputs
 .out outpos position
 .out outtc0 texcoord0
@@ -124,9 +126,11 @@
     ; outtex = intex
     mov outtc0, intex.xy
 
-    ; outtex2 = intex + texoff in x
-    mov r1, texoff
-    add outtc1, intex.zw, r1.xy
+    ; outtex2 = posttransform xy
+    ; mov outtc1, r1.xy
+    mov r9, texstretch
+    mul r1.xy, r1.xy, r9.xy
+    add outtc1, r1.xy, r9.zw
 
     ; Multiply bone matrix onto input normal
     dp3 r13.x, innrm, r10

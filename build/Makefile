@@ -2,9 +2,9 @@
 BASEDIR := ../
 
 # Binary name, author name, desc
-TARGET := nordlicht22
+TARGET := revision23
 AUTHOR := SVatG
-DESC := Hotel Nordlicht
+DESC := tbb
 
 # Working directories
 BUILD := $(BASEDIR)/build
@@ -66,14 +66,14 @@ ROMFILES_PNG := $(PNGFILES:.png=.bin)
 %.bin: %.png
 	$(TEX) $< -o $(ROMFS)/$@
 
-# flac-to-bin / mp3-to-bin / ogg-to-bin with basic music converter
-%.bin: %.flac
+# flac-to-ogg / mp3-to-ogg / ogg-to-ogg with basic music converter
+%.ogg: %.flac
 	./../tooling/convertmusic.sh $< $(ROMFS)/$@
 
-%.bin: %.mp3
+%.ogg: %.mp3
 	./../tooling/convertmusic.sh $< $(ROMFS)/$@
 
-%.bin: %.ogg
+%.ogg: %.ogg
 	./../tooling/convertmusic.sh $< $(ROMFS)/$@
 
 # Basic "binary blob" build rule
@@ -114,8 +114,8 @@ endef
 
 # Actual binary
 all: $(OUTPUT).3dsx
-$(OUTPUT).3dsx: $(OUTPUT).elf $(OUTPUT).smdh $(ROMFILES_PNG) music.bin
+$(OUTPUT).3dsx: $(OUTPUT).elf $(OUTPUT).smdh $(ROMFILES_PNG) music.ogg
 $(OUTPUT).elf: $(OFILES)
 
 clean:
-	rm -fr $(TARGET).3dsx $(OUTPUT).smdh $(TARGET).elf *.o *.h *.lst *.shbin *~ $(ROMFS)/tex_*.bin $(ROMFS)/music.bin
+	rm -fr $(TARGET).3dsx $(OUTPUT).smdh $(TARGET).elf *.o *.h *.lst *.shbin *~ $(ROMFS)/tex_*.bin $(ROMFS)/music.ogg

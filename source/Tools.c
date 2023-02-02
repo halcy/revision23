@@ -121,7 +121,7 @@ void ensureFlatShader() {
     AttrInfo_AddLoader(attrInfo, 1, GPU_FLOAT, 2);
 }
 
-void fullscreenQuad(C3D_Tex texture, float iod, float iodmult) {
+void fullscreenQuad(C3D_Tex texture, float shift, float zoom) { 
     ensureFlatShader();
     
     C3D_TexSetFilter(&texture, GPU_LINEAR, GPU_NEAREST);
@@ -132,18 +132,29 @@ void fullscreenQuad(C3D_Tex texture, float iod, float iodmult) {
     C3D_TexEnv* env = C3D_GetTexEnv(0);
     u8 fadeValInt = fadeVal * 255.0;
     C3D_TexEnvInit(env);
-    C3D_TexEnvColor(env, 0x00FFFFFF + (fadeValInt << 24));
+    // hack
+    if(zoom == 1.0) {
+        C3D_TexEnvColor(env, 0x00FFFFFF + (fadeValInt << 24));
+    }
+    else {
+        C3D_TexEnvColor(env, 0xFFFFFFFF);
+    }
     C3D_TexEnvSrc(env, C3D_Both, GPU_TEXTURE0, GPU_CONSTANT, 0);
     C3D_TexEnvFunc(env, C3D_Both, GPU_MODULATE);
 
-    float preShift = 0.0; // iodmult > 0.0 ? 0.05 : 0.0;
-    float textureLeft = 0.0;
-    float textureRight = 400.0 / 512.0;
-    float textureTop = 1.0 - (float)SCREEN_HEIGHT / (float)512.0;
-    float textureBottom = 1.0;
+    shift = shift / 400.0;
+    float textureLeft = (0.0 + shift) * zoom;
+    float textureRight = ((400.0 / 512.0) + shift) * zoom;
+    float textureTop = ((1.0 - (float)SCREEN_HEIGHT / (float)512.0)) * zoom;
+    float textureBottom = 1.0 * zoom;
    
     // Turn off depth test as well as write
-    C3D_DepthTest(false, GPU_GEQUAL, GPU_WRITE_COLOR);
+    if(zoom == 1.0) {  // hack
+        C3D_DepthTest(false, GPU_GEQUAL, GPU_WRITE_COLOR);
+    }
+    else {
+        C3D_DepthTest(true, GPU_GEQUAL, GPU_WRITE_COLOR);
+    }
    
     // Draw a textured quad directly
     C3D_ImmDrawBegin(GPU_TRIANGLES);
@@ -500,7 +511,7 @@ bool loadTex3DSMem(C3D_Tex* tex, C3D_TexCube* cube, const void* data, size_t siz
 void fade() {
     if(fadeVal > 0) {
         C3D_AlphaBlend(GPU_BLEND_ADD, GPU_BLEND_ADD, GPU_SRC_ALPHA, GPU_ONE_MINUS_SRC_ALPHA, GPU_CONSTANT_ALPHA, GPU_ONE_MINUS_CONSTANT_ALPHA);
-        fullscreenQuad(fade_tex, 0.0, 0.0);
+        fullscreenQuad(fade_tex, 0.0, 1.0);
     }
 }
 
