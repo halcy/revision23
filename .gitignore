@@ -4,3 +4,5 @@
 *.3dsx
 /romfs/tex_*.bin
 /romfs/music.bin
+/romfs/music.ogg
+config.mk

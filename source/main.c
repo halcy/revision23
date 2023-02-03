@@ -82,11 +82,8 @@ struct sync_cb rocket_callbakcks = {
 };
 #endif
 
-//#define ROCKET_HOST "192.168.56.1"
-#define ROCKET_HOST "192.168.1.129"
-// #define ROCKET_HOST "127.0.0.1"
-// #define ROCKET_HOST "192.168.10.129"
-
+// Rocket settings
+#define ROCKET_HOST CONF_ROCKET_IP
 #define SOC_ALIGN 0x1000
 #define SOC_BUFFERSIZE 0x100000
 
@@ -107,6 +104,7 @@ int connect_rocket() {
     return(0);
 }
 
+// Externs for effects
 extern void effectTunnelInit();
 extern void effectTunnelDraw(C3D_RenderTarget* targetLeft, C3D_RenderTarget* targetRight, float row, float iod);
 

@@ -2,9 +2,11 @@
 * For conditions of distribution and use, see copyright notice in COPYING
 */
 
-// define SYNC_PLAYER here, if desired.
-// remember to make clean, if you do
+// remember to make clean if you change this
+#define CONF_PLAYER 1
+#if CONF_PLAYER
 #define SYNC_PLAYER
+#endif
 
 #ifndef SYNC_H
 #define SYNC_H

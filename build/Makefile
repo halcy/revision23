@@ -1,3 +1,6 @@
+# Grab settings
+include ../config.mk
+
 # Base directory is one up
 BASEDIR := ../
 
@@ -34,7 +37,7 @@ TEX := tex3ds
 # Tool flags
 ARCH := -g -march=armv6k -mtune=mpcore -mfloat-abi=hard -mword-relocations
 CFLAGS := -Wno-missing-braces -O3 -std=c99 -fomit-frame-pointer -ffunction-sections -mfloat-abi=hard -ffast-math $(ARCH) -D__3DS__ -DABGR32Pixels \
-		$(foreach dir,$(LIBDIRS),-I$(dir)/include) -I$(BUILD)
+		$(foreach dir,$(LIBDIRS),-I$(dir)/include) -I$(BUILD) -DCONF_PLAYER=$(COFIG_PLAYER_MODE) -DCONF_ROCKET_IP='"$(CONFIG_PC_IP)"'
 ASFLAGS := 
 LDFLAGS := -specs=3dsx.specs -g $(ARCH) -Wl,-Map,$(notdir $*.map) \
 	   $(foreach dir,$(LIBDIRS),-L$(dir)/lib)
