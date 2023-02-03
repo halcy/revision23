@@ -10,7 +10,6 @@
 #define CLEAR_COLOR 0x555555FF
 
 C3D_Tex fade_tex;
-C3D_Tex bg_tex;
 static Pixel* fadePixels;
 static Bitmap fadeBitmap;
 float fadeVal;
@@ -123,11 +122,6 @@ int connect_rocket() {
     return(0);
 }
 
-// Externs for effects
-extern void effectTunnelInit();
-extern void effectTunnelDraw(C3D_RenderTarget* targetLeft, C3D_RenderTarget* targetRight, float row, float iod);
-// extern void effectTunnelDestroy();
-
 FILE *audioFile;
 u8 audioTempBuf[AUDIO_BUFSIZE * 4];
 void audio_callback(void* ignored) {
@@ -182,44 +176,44 @@ shaderProgram_s shaderProgramSkybox;
 //     }
 // }
 
-// Texture loading: Load into linear memory
-void loadTexCache2(C3D_Tex* tex, C3D_TexCube* cube, const char* path) {
-    FILE* f = fopen(path, "rb");
-    if (!f) {
-        printf("Texture file not found: %s\n", path);
-        return;
-    }
-    
-    Tex3DS_Texture t3x = Tex3DS_TextureImportStdio(f, tex, cube, false);
-    fclose(f); 
-    if (!t3x) {
-        printf("Final texture load failure on %s\n", path);
-        return;
-    }
-    
-    // Delete the t3x object since we don't need it
-    Tex3DS_TextureFree(t3x);
+// Effect sync structs
+typedef void (*init_fun_t)();
+typedef void (*render_fun_t)(C3D_RenderTarget* targetLeft, C3D_RenderTarget* targetRight, float iod, float time);
+typedef void (*exit_fun_t)();
 
-    // printf("Free linear memory after tex load: %d\n", linearSpaceFree());
-}
+typedef struct effect { 
+    init_fun_t init; 
+    render_fun_t render; 
+    exit_fun_t exit; 
+} effect;
 
-// Texture loading: Linear to VRAM
-void texToVRAM2(C3D_Tex* linear, C3D_Tex* vram) {
-    if(C3D_TexInitVRAM(vram, linear->width, linear->height, linear->fmt)) {
-        C3D_TexLoadImage(vram, linear->data, GPU_TEXFACE_2D, 0);
-    } 
-    else {
-        printf("Texture upload failed!");
-    }
-}
+// Externs for effects
+extern void effectTunnelInit();
+extern void effectTunnelRender(C3D_RenderTarget* targetLeft, C3D_RenderTarget* targetRight, float row, float iod);
+extern void effectTunnelExit();
 
-C3D_Tex scrollImgs[2];
-int vramScrollImg = -1;
+extern void effectScrollerInit();
+extern void effectScrollerRender(C3D_RenderTarget* targetLeft, C3D_RenderTarget* targetRight, float row, float iod);
+extern void effectScrollerExit();
 
 int main() {
     bool DUMPFRAMES = false;
     bool DUMPFRAMES_3D = false;
     float DUMPFRAMES_3D_SEP = 0.4;
+
+    // Set up effect list. Sequencing is done in Rocket
+    #define EFFECT_MAX 2
+    effect effect_list[EFFECT_MAX];
+    
+    // The tunnel-actually-platform effect currently will NOT exist cleanly. (TODO FIXME? will be replaced anyways)
+    effect_list[0].init = effectTunnelInit;
+    effect_list[0].render = effectTunnelRender;
+    effect_list[0].exit = effectTunnelExit;
+    
+    // Actually the effects are just kind of broken generally. TODO: Fix
+    effect_list[1].init = effectScrollerInit;
+    effect_list[1].render = effectScrollerRender;
+    effect_list[1].exit = effectScrollerExit;
 
     // Initialize graphics
     gfxInit(GSP_RGBA8_OES, GSP_BGR8_OES, false);
@@ -276,7 +270,7 @@ int main() {
     if(connect_rocket()) {
         return(0);
     }
-    
+
     // Load shaders
     vshader_dvlb = DVLB_ParseFile((u32*)vshader_shbin, vshader_shbin_size);
     shaderProgramInit(&shaderProgram);
@@ -316,6 +310,11 @@ int main() {
     wave_buffer[1].data_vaddr = &audio_buffer[AUDIO_BUFSIZE * sizeof(int16_t)];
     wave_buffer[1].nsamples = AUDIO_BUFSIZE / CHANNELS;
     
+    // Init bitmap used for fading
+    fadePixels = (Pixel*)linearAlloc(64 * 64 * sizeof(Pixel));
+    InitialiseBitmap(&fadeBitmap, 64, 64, BytesPerRowForWidth(64), fadePixels);
+    C3D_TexInit(&fade_tex, 64, 64, GPU_RGBA8);
+
     // Get first row value
     double row = 0.0;  
 
@@ -328,19 +327,13 @@ int main() {
     }
 #endif
 
-    // Load scroll textures
-    loadTexCache2(&scrollImgs[0], NULL, "romfs:/tex_scroll1.bin");
-    loadTexCache2(&scrollImgs[1], NULL, "romfs:/tex_scroll2.bin");
-    texToVRAM2(&scrollImgs[0], &fade_tex);
-    texToVRAM2(&scrollImgs[1], &bg_tex);
-    C3D_TexSetFilter(&bg_tex, GPU_LINEAR, GPU_LINEAR);
-
-    // Set up effect code
-    effectTunnelInit();
-
     const struct sync_track* sync_fade = sync_get_track(rocket, "global.fade");
+    const struct sync_track* sync_effect = sync_get_track(rocket, "global.effect");;    
     const struct sync_track* sync_img = sync_get_track(rocket, "global.image");
-    int fc = 0;
+    
+    // Start up first effect
+    int current_effect = (int)sync_get_val(sync_effect, row + 0.01);
+    effect_list[current_effect].init();
 
     // Play music
     ndspSetCallback(&audio_callback, 0);
@@ -349,6 +342,7 @@ int main() {
     
     row = audio_get_row();
 
+    int fc = 0;
     while (aptMainLoop()) {        
         if(!DUMPFRAMES) {
             row = audio_get_row();
@@ -367,16 +361,23 @@ int main() {
         }
 #endif
 
-        // Maybe not needed anymore idk
-        fadeVal = sync_get_val(sync_fade, row);
-        int whichImg = sync_get_val(sync_img, row);
-        whichImg = min(whichImg, 7);
-        if(whichImg != vramScrollImg) {
-            C3D_TexDelete(&fade_tex);
-            texToVRAM2(&scrollImgs[whichImg], &fade_tex);
-            vramScrollImg = whichImg;
+        // Effect switcher
+        int new_effect = (int)sync_get_val(sync_effect, row);
+        if(new_effect < 0) {
+            new_effect = 0;
         }
-        C3D_TexSetFilter(&fade_tex, GPU_LINEAR, GPU_LINEAR);
+        if(new_effect >= EFFECT_MAX) {
+            new_effect = EFFECT_MAX - 1;
+        }
+        if(new_effect != -1 && new_effect != current_effect) {
+            effect_list[current_effect].exit();
+            current_effect = new_effect;
+            effect_list[current_effect].init();
+        }
+
+
+        // Fading update
+        fadeVal = sync_get_val(sync_fade, row);
 
         //printf("ppf\n");
         hidScanInput();
@@ -393,9 +394,8 @@ int main() {
 
         float iod = slider / 3.0;
 
-        // TODO: put effect switcher back in
-
-        effectTunnelDraw(targetLeft, targetRight, row, iod);
+        // Draw
+        effect_list[current_effect].render(targetLeft, targetRight, iod, row);
 
         // Frame dumper code
         if(DUMPFRAMES) {

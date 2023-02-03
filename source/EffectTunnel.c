@@ -470,7 +470,7 @@ void tunnelShadeEnv() {
     C3D_CullFace(GPU_CULL_NONE);
 }
 
-void effectTunnelDraw(C3D_RenderTarget* targetLeft, C3D_RenderTarget* targetRight, float row, float iod) {
+void effectTunnelRender(C3D_RenderTarget* targetLeft, C3D_RenderTarget* targetRight, float row, float iod) {
     waitForA("etd called");  
 
     // Update scroll texture
@@ -564,9 +564,6 @@ void effectTunnelDraw(C3D_RenderTarget* targetLeft, C3D_RenderTarget* targetRigh
 
     C3D_FrameDrawOn(targetLeft);
     C3D_RenderTargetClear(targetLeft, C3D_CLEAR_ALL, 0x000000FF, 0);
-
-    C3D_AlphaBlend(GPU_BLEND_ADD, GPU_BLEND_ADD, GPU_SRC_ALPHA, GPU_ONE_MINUS_SRC_ALPHA, GPU_SRC_ALPHA, GPU_ONE_MINUS_SRC_ALPHA);
-    fullscreenQuad(bg_tex, 0.0, 1.01);
     
     tunnelShadeEnv();
     Mtx_PerspStereoTilt(&projection, 70.0f*M_PI/180.0f, 300.0f/240.0f, 0.01f, 6000.0f, -iod,  7.0f, false);
@@ -588,9 +585,7 @@ void effectTunnelDraw(C3D_RenderTarget* targetLeft, C3D_RenderTarget* targetRigh
 
         C3D_FrameDrawOn(targetRight);
         C3D_RenderTargetClear(targetRight, C3D_CLEAR_ALL, 0x000000FF, 0); 
-
-        C3D_AlphaBlend(GPU_BLEND_ADD, GPU_BLEND_ADD, GPU_SRC_ALPHA, GPU_ONE_MINUS_SRC_ALPHA, GPU_SRC_ALPHA, GPU_ONE_MINUS_SRC_ALPHA);
-        fullscreenQuad(bg_tex, 2.0, 1.01);
+        
         tunnelShadeEnv();
 
         Mtx_PerspStereoTilt(&projection, 70.0f*M_PI/180.0f, 300.0f/240.0f, 0.01f, 6000.0f, iod, 7.0f, false);
@@ -607,4 +602,8 @@ void effectTunnelDraw(C3D_RenderTarget* targetLeft, C3D_RenderTarget* targetRigh
 
     // Swap
     C3D_FrameEnd(0);
+}
+
+void effectTunnelExit() {
+    // nada
 }
