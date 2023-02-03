@@ -6,7 +6,7 @@ BASEDIR := ../
 
 # Binary name, author name, desc
 TARGET := revision23
-AUTHOR := SVatG
+AUTHOR := others and also SVatG
 DESC := tbb
 
 # Working directories
@@ -59,7 +59,7 @@ ROMFILES_PNG := $(PNGFILES:.png=.bin)
 .SUFFIXES:
 
 # Base compilation / assembly build rules
-%.o: %.c
+%.o: %.c music.ogg
 	$(CC) $(CFLAGS) -c $< -o $@
 
 %.o: %.s
@@ -71,13 +71,13 @@ ROMFILES_PNG := $(PNGFILES:.png=.bin)
 
 # flac-to-ogg / mp3-to-ogg / ogg-to-ogg with basic music converter
 %.ogg: %.flac
-	./../tooling/convertmusic.sh $< $(ROMFS)/$@
+	./../tooling/convertmusic.sh $< $(ROMFS)/$@ $(BUILD)/music_meta.h
 
 %.ogg: %.mp3
-	./../tooling/convertmusic.sh $< $(ROMFS)/$@
+	./../tooling/convertmusic.sh $< $(ROMFS)/$@ $(BUILD)/music_meta.h
 
 %.ogg: %.ogg
-	./../tooling/convertmusic.sh $< $(ROMFS)/$@
+	./../tooling/convertmusic.sh $< $(ROMFS)/$@ $(BUILD)/music_meta.h
 
 # Basic "binary blob" build rule
 %.bin.o: %.bin

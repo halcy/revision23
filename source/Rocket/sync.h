@@ -3,7 +3,6 @@
 */
 
 // remember to make clean if you change this
-#define CONF_PLAYER 1
 #if CONF_PLAYER
 #define SYNC_PLAYER
 #endif

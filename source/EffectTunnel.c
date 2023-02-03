@@ -1,5 +1,6 @@
 /**
- * LASERTUNNEL
+ * basic "multiple loadable 3D objects" effect, originally a tunnel, now a platform
+ * essentially a bone animation effect, neat for getting stuff from blender
  */
 
 #include <stdlib.h>
@@ -157,12 +158,11 @@ void texToVRAM(C3D_Tex* linear, C3D_Tex* vram) {
 }
  
 // The actual segments
-#define SEGMENT_COUNT 2
+#define SEGMENT_COUNT 1
 segment tunnel[SEGMENT_COUNT];
 
 // Tunnel segment 1: Doors
 bool isTexAInVram = false;
-int texBStatus = -1;
 int numPlatVerts = 0;
 void loadSegmentDoors(segment* self) {
     // Load vertices
@@ -189,15 +189,10 @@ void loadSegmentDoors(segment* self) {
 
     // Load textures
     isTexAInVram = true;
-    texBStatus = 0;
     texToVRAM(&self->texALinear, &self->texA);
-    texToVRAM(&self->texBLinear, &self->texB);
     
     C3D_TexSetFilter(&self->texA, GPU_LINEAR, GPU_LINEAR);
     C3D_TexSetWrap(&self->texA, GPU_REPEAT, GPU_REPEAT);
-
-    C3D_TexSetFilter(&self->texB, GPU_LINEAR, GPU_LINEAR);
-    C3D_TexSetWrap(&self->texB, GPU_REPEAT, GPU_REPEAT);
 
     // Set loaded
     self->loaded = true;
@@ -401,36 +396,6 @@ void genSegmentDoors(segment* self, char* syncPrefix) {
     self->loaded = false;
 }
 
-// Tunnel segment 2: Train tunnel
-void loadSegmentTrain(segment* self) {
-    // Load vertices
-    //printf("allocing %d * %d = %d\n", sizeof(vertex_rigged), textNumVerts, textNumVerts * sizeof(vertex_rigged));
-    //printf("Free linear memory after vert alloc: %d\n", linearSpaceFree());
-
-    self->vbo = (vertex_rigged*)linearAlloc(sizeof(vertex_rigged) * textNumVerts);
-    memcpy(&self->vbo[0], textVerts, textNumVerts * sizeof(vertex_rigged));
-    self->vertCount = textNumVerts;
-
-    // Load textures
-    texToVRAM(&self->texALinear, &self->texA);
-    C3D_TexSetFilter(&self->texA, GPU_LINEAR, GPU_LINEAR);
-    C3D_TexSetWrap(&self->texA, GPU_REPEAT, GPU_REPEAT);
-
-    texToVRAM(&self->texBLinear, &self->texB);
-    C3D_TexSetFilter(&self->texB, GPU_LINEAR, GPU_LINEAR);
-    C3D_TexSetWrap(&self->texB, GPU_REPEAT, GPU_REPEAT);
-
-    texToVRAM(&self->texCLinear, &self->texC);
-    C3D_TexSetFilter(&self->texC, GPU_LINEAR, GPU_LINEAR);
-    C3D_TexSetWrap(&self->texC, GPU_REPEAT, GPU_REPEAT);
-
-    // Set loaded
-    self->loaded = true;
-}
-
-void updateSegmentTrain(segment* self, float row) {
-    // Nada
-}
 
 void setBonesFromSyncB(const struct sync_track* track, float row, int boneFirst, int boneLast) {
     float animPosFloat = sync_get_val(track, row);
@@ -446,114 +411,6 @@ void setBonesFromSyncB(const struct sync_track* track, float row, int boneFirst,
         }
         C3D_FVUnifMtx3x4(GPU_VERTEX_SHADER, uLocBone[i], &boneMat);
     }
-}
-
-void drawSegmentTrain(segment* self, float row, C3D_Mtx baseView) {
-    waitForA("draw train");
-
-    // Add VBO to draw buffer
-    C3D_BufInfo* bufInfo = C3D_GetBufInfo();
-    BufInfo_Init(bufInfo);
-    BufInfo_Add(bufInfo, (void*)self->vbo, sizeof(vertex_rigged), 4, 0x3210);
-        
-    // Get frame and push bones
-    setBonesFromSyncB(self->syncB, row, 0, 0);
-    
-    // Set texcoord offset
-    //float texoff = sync_get_val(self->syncTexOff, row);
-    C3D_FVUnifSet(GPU_VERTEX_SHADER, uLocTexoff, 0.0, 0.0, 0.0, 0.0);
-
-    // Send new modelview
-    float rotation = sync_get_val(self->syncA, row);
-    Mtx_RotateX(&baseView, M_PI * -0.46, true);
-    Mtx_RotateZ(&baseView, M_PI * rotation, true);
-    C3D_FVUnifMtx4x4(GPU_VERTEX_SHADER, uLocModelview,  &baseView);
-
-    waitForA("bind");
-
-    // Bind textures
-    C3D_TexBind(0, &scrollTex);
-
-    waitForA("bound");
-
-    // Set up lightenv
-    C3D_LightEnvInit(&lightEnv);
-    C3D_LightEnvBind(&lightEnv);
-    
-    LightLut_Phong(&lutPhong, 100.0);
-    C3D_LightEnvLut(&lightEnv, GPU_LUT_D0, GPU_LUTINPUT_LN, false, &lutPhong);
-    
-    LightLut_FromFunc(&lutShittyFresnel, badFresnel, 1.9, false);
-    C3D_LightEnvLut(&lightEnv, GPU_LUT_FR, GPU_LUTINPUT_NV, false, &lutShittyFresnel);
-    C3D_LightEnvFresnel(&lightEnv, GPU_PRI_SEC_ALPHA_FRESNEL);
-    
-    waitForA("draw");
-
-    C3D_FVec lightVec = FVec4_New(0.0, 0.0, 0.0, 1.0);
-    C3D_LightInit(&light, &lightEnv);
-
-    float lightStrength = 1.0;
-    float lightStrengthAmbi = 0.5;
-    C3D_Material lightMaterial = {
-        { lightStrengthAmbi, lightStrengthAmbi, lightStrengthAmbi }, //ambient
-        { 1.0,  1.0,  1.0 }, //diffuse
-        { 1.0f, 1.0f, 1.0f }, //specular0
-        { 0.0f, 0.0f, 0.0f }, //specular1
-        { 0.0f, 0.0f, 0.0f }, //emission
-    };
-    C3D_LightColor(&light, lightStrength, lightStrength, lightStrength);
-    C3D_LightPosition(&light, &lightVec);
-    C3D_LightEnvMaterial(&lightEnv, &lightMaterial);
-
-    waitForA("lutset");
-
-    // Set up draw env
-    C3D_TexEnv* env = C3D_GetTexEnv(0);
-    C3D_TexEnvInit(env);
-    C3D_TexEnvSrc(env, C3D_Both, GPU_TEXTURE0, GPU_PREVIOUS, 0);
-    C3D_TexEnvFunc(env, C3D_RGB, GPU_REPLACE);
-    
-    env = C3D_GetTexEnv(1);
-    C3D_TexEnvInit(env);
-
-    env = C3D_GetTexEnv(2);
-    C3D_TexEnvInit(env);
-    /*C3D_TexEnvSrc(env, C3D_Both, GPU_PREVIOUS, GPU_TEXTURE1, 0);
-    C3D_TexEnvFunc(env, C3D_RGB, GPU_ADD);*/
-
-    // GPU state for transparent blend
-    C3D_CullFace(GPU_CULL_NONE);
-    C3D_DepthTest(true, GPU_GEQUAL, GPU_WRITE_COLOR);
-    C3D_AlphaBlend(GPU_BLEND_ADD, GPU_BLEND_ADD, GPU_SRC_ALPHA, GPU_ONE_MINUS_SRC_ALPHA, GPU_SRC_ALPHA, GPU_ONE_MINUS_SRC_ALPHA);
-
-    waitForA("drawcall");
-
-    // Now draw
-    C3D_DrawArrays(GPU_TRIANGLES, 0, self->vertCount);
-}
-
-void deleteSegmentTrain(segment* self) {
-    self->loaded = false;
-    linearFree(self->vbo);
-    C3D_TexDelete(&self->texA);
-}
-
-void genSegmentTrain(segment* self, char* syncPrefix) {
-    self->load = loadSegmentTrain;
-    self->update = updateSegmentTrain;
-    self->draw = drawSegmentTrain;
-    self->delete = deleteSegmentTrain;
-    self->length = 1154.0;
-    self->alias = -1;
-
-    // Get sync params
-    char paramName[255];
-    sprintf(paramName, "%s.rot", syncPrefix);
-    self->syncA = sync_get_track(rocket, paramName);
-    sprintf(paramName, "%s.text", syncPrefix);
-    self->syncB = sync_get_track(rocket, paramName);
-
-    self->loaded = false;
 }
 
 void effectTunnelInit() {
@@ -585,18 +442,7 @@ void effectTunnelInit() {
     // Init tunnel segments
     genSegmentDoors(&tunnel[0], "doors");
     loadTexCache(&tunnel[0].texALinear, NULL, "romfs:/tex_platform.bin");
-    loadTexCache(&tunnel[0].texBLinear, NULL, "romfs:/tex_corr.bin");
     tunnel[0].load(&tunnel[0]);
-    
-    waitForA("gen");
-    genSegmentTrain(&tunnel[1], "train");
-    waitForA("load");
-    loadTexCache(&tunnel[1].texALinear, NULL, "romfs:/tex_tunnel.bin");
-    loadTexCache(&tunnel[1].texBLinear, NULL, "romfs:/tex_greets1.bin");
-    loadTexCache(&tunnel[1].texCLinear, NULL, "romfs:/tex_greets2.bin");
-
-    waitForA("load B");
-    tunnel[1].load(&tunnel[1]);
 
     // prep scroller
     C3D_TexInit(&scrollTex, 128, 128, GPU_RGBA8);
