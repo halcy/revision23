@@ -537,7 +537,7 @@ u8* readFileMem(const char* fileName, u32* fileSize, bool linear) {
 }
 
 // Wait for A B (good for debugging)
-// #define SHITTY_BREAKPOINTS
+#define SHITTY_BREAKPOINTS
 void waitForA(const char* msg) {
 #ifdef SHITTY_BREAKPOINTS
     printf(msg);

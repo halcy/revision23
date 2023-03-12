@@ -1,6 +1,7 @@
 #ifndef __TOOLS_H__
 #define __TOOLS_H__
 
+#ifndef TOOLS_BASICS_ONLY
 #include <3ds.h>
 #include <citro3d.h>
 #include <string.h>
@@ -26,10 +27,12 @@
 #include "GraphicsLibrary/Pixels.h"
 #include "GraphicsLibrary/Bitmap.h"
 #include "GraphicsLibrary/Drawing.h"
+#endif
 
 #include "VectorLibrary/Vector.h"
 #include "VectorLibrary/Matrix.h"
 
+#ifndef TOOLS_BASICS_ONLY
 #include "Perlin.h"
 #include "Rasterize.h"
 
@@ -82,11 +85,34 @@ extern void fullscreenQuadGlitch(C3D_Tex texture, int parts, float time, float a
 
 extern int32_t mulf32(int32_t a, int32_t b);
 extern int32_t divf32(int32_t a, int32_t b);
+#endif
 
 typedef struct { float position[3]; float texcoord[2]; float normal[3]; } vertex;
 typedef struct { float position[3]; float texcoord[2]; float normal[3]; float tangent[3]; } vertex2;
-typedef struct { float position[3]; float bones; float normal[3]; float texcoord[4]; } vertex_rigged;
+typedef struct { float position[3]; float bones[2]; float boneWeights[2]; float normal[3]; float texcoord[2]; } vertex_rigged;
 
+typedef struct fbxBasedObject {
+    // Vertices with bones
+    // layout: {float3 pos, float3 bones, float3 normals, float2 texcoord }
+    vertex_rigged* vbo;
+    int32_t vertCount;
+    
+    // animation
+    float* animFrames;
+    int32_t boneCount;
+    int32_t frameCount;
+
+    // Sync track
+    const struct sync_track* frameSync;
+
+#ifndef TOOLS_BASICS_ONLY
+    // Texture
+    C3D_Tex tex;
+#endif    
+ } fbxBasedObject;
+#define FBX_FRAME_IDX(frame, bone, element, boneCount) (((frame) * ((boneCount) * 12) + (bone) * 12 + (element)))
+
+#ifndef TOOLS_BASICS_ONLY
 inline void setVert(vertex* vert, vec3_t p, vec2_t t) {
     vert->position[0] = p.x;
     vert->position[1] = p.y;
@@ -95,14 +121,20 @@ inline void setVert(vertex* vert, vec3_t p, vec2_t t) {
     vert->texcoord[1] = t.y;
 }
 
-inline void setVertRigged(vertex_rigged* vert, vec3_t p, vec2_t t, int bone) {
+inline void setVertRigged(vertex_rigged* vert, vec3_t p, vec2_t bones, vec2_t boneWeights, vec3_t n, vec2_t t) {
     vert->position[0] = p.x;
     vert->position[1] = p.y;
     vert->position[2] = p.z;
+    vert->bones[0] = bones.x * 3.0;
+    vert->bones[1] = bones.y * 3.0;
+    vert->boneWeights[0] = boneWeights.x;
+    vert->boneWeights[1] = boneWeights.y;
+    vert->normal[0] = p.x;
+    vert->normal[1] = p.y;
+    vert->normal[2] = p.z;
     vert->texcoord[0] = t.x;
     vert->texcoord[1] = t.y;
     
-    vert->bones = bone * 3.0;
 }
 
 inline void setVertNorm(vertex* vert, vec3_t p, vec2_t t, vec3_t n) {
@@ -145,6 +177,7 @@ inline int buildQuad(vertex* vert, vec3_t a, vec3_t b, vec3_t c, vec3_t d, vec2_
         return 6;
 }
 
+/*
 inline int buildQuadRigged(vertex_rigged* vert, vec3_t a, vec3_t b, vec3_t c, vec3_t d, vec2_t ta, vec2_t tb, vec2_t tc, vec2_t td, int bone) {
         setVertRigged(vert, a, ta, bone); vert++;
         setVertRigged(vert, b, tb, bone); vert++;
@@ -155,6 +188,7 @@ inline int buildQuadRigged(vertex_rigged* vert, vec3_t a, vec3_t b, vec3_t c, ve
         
         return 6;
 }
+*/
 
 inline int buildQuadNormal(vertex* vert, vec3_t a, vec3_t b, vec3_t c, vec3_t d, vec2_t ta, vec2_t tb, vec2_t tc, vec2_t td, vec3_t n) {
         setVertNorm(vert, a, ta, n); vert++;
@@ -327,4 +361,5 @@ extern bool loadTex3DSMem(C3D_Tex* tex, C3D_TexCube* cube, const void* data, siz
 extern u8* readFileMem(const char* fileName, u32* fileSize, bool linear);
 extern void waitForA(const char* msg);
 
+#endif
 #endif

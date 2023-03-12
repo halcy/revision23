@@ -188,13 +188,9 @@ typedef struct effect {
 } effect;
 
 // Externs for effects
-extern void effectTunnelInit();
-extern void effectTunnelRender(C3D_RenderTarget* targetLeft, C3D_RenderTarget* targetRight, float row, float iod);
-extern void effectTunnelExit();
-
-extern void effectScrollerInit();
-extern void effectScrollerRender(C3D_RenderTarget* targetLeft, C3D_RenderTarget* targetRight, float row, float iod);
-extern void effectScrollerExit();
+extern void effectStreetInit();
+extern void effectStreetRender(C3D_RenderTarget* targetLeft, C3D_RenderTarget* targetRight, float row, float iod);
+extern void effectStreetExit();
 
 int main() {
     bool DUMPFRAMES = false;
@@ -206,14 +202,14 @@ int main() {
     effect effect_list[EFFECT_MAX];
     
     // The tunnel-actually-platform effect currently will NOT exist cleanly. (TODO FIXME? will be replaced anyways)
-    effect_list[0].init = effectTunnelInit;
-    effect_list[0].render = effectTunnelRender;
-    effect_list[0].exit = effectTunnelExit;
+    effect_list[0].init = effectStreetInit;
+    effect_list[0].render = effectStreetRender;
+    effect_list[0].exit = effectStreetExit;
     
     // Actually the effects are just kind of broken generally. TODO: Fix
-    effect_list[1].init = effectScrollerInit;
-    effect_list[1].render = effectScrollerRender;
-    effect_list[1].exit = effectScrollerExit;
+    effect_list[1].init = effectStreetInit;
+    effect_list[1].render = effectStreetRender;
+    effect_list[1].exit = effectStreetExit;
 
     // Initialize graphics
     gfxInit(GSP_RGBA8_OES, GSP_BGR8_OES, false);
@@ -370,6 +366,7 @@ int main() {
             new_effect = EFFECT_MAX - 1;
         }
         if(new_effect != -1 && new_effect != current_effect) {
+            printf("effect switch %d -> %d\n", current_effect, new_effect);
             effect_list[current_effect].exit();
             current_effect = new_effect;
             effect_list[current_effect].init();
@@ -395,7 +392,7 @@ int main() {
         float iod = slider / 3.0;
 
         // Draw
-        effect_list[current_effect].render(targetLeft, targetRight, iod, row);
+        effect_list[current_effect].render(targetLeft, targetRight, row, iod);
 
         // Frame dumper code
         if(DUMPFRAMES) {
