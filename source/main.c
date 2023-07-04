@@ -39,8 +39,7 @@ u8* music_bin;
 #define SONG_BPM 127.0
 #define SONG_BPS (SONG_BPM / 60.0)
 #define SONG_SPS 32000
-#define SONG_SPB (SONG_SPS / SONG_BPS)
-#define MUSIC_LEN_SEC 0.5
+#define SONG_SPB (SONG_SPS / SONG_BPS) 
 #define MUSIC_SIZE ((size_t)(MUSIC_LEN_SEC * CHANNELS * SONG_SPS * sizeof(int16_t)))
 
 #define ROWS_PER_BEAT 8
@@ -58,7 +57,8 @@ uint8_t fill_buffer = 0;
 uint8_t audio_playing = 1;
 
 double audio_get_row() {
-    return (double)(sample_pos + SYNC_OFFSET_SEC * SONG_SPS) / ((double)SAMPLES_PER_ROW * (double)CHANNELS);
+    double row = (double)(sample_pos + SYNC_OFFSET_SEC * SONG_SPS) / ((double)SAMPLES_PER_ROW);
+    return row;
 }
 
 // #define DEV_MODE
@@ -86,6 +86,7 @@ void audio_pause(void *ignored, int flag) {
 }
 
 void audio_set_row(void *ignored, int row) {
+    printf("Set row: %d\n", row);
     ignored;
     sample_pos = row * SAMPLES_PER_ROW;
 }

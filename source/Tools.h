@@ -361,5 +361,9 @@ extern bool loadTex3DSMem(C3D_Tex* tex, C3D_TexCube* cube, const void* data, siz
 extern u8* readFileMem(const char* fileName, u32* fileSize, bool linear);
 extern void waitForA(const char* msg);
 
+void loadTexture(C3D_Tex* tex, C3D_TexCube* cube, const char* path);
+fbxBasedObject loadFBXObject(const char* filename, const char* textureFilename, const char* syncPrefix);
+void setBonesFromSync(fbxBasedObject* model, int* boneLocs, float row);
+
 #endif
 #endif

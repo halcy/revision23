@@ -536,7 +536,8 @@ u8* readFileMem(const char* fileName, u32* fileSize, bool linear) {
     return(buffer);
 }
 
-// Wait for A B (good for debugging)
+// Print a message and wait for A B (good for debugging without access
+// to an actual ICD)
 #define SHITTY_BREAKPOINTS
 void waitForA(const char* msg) {
 #ifdef SHITTY_BREAKPOINTS
@@ -546,7 +547,7 @@ void waitForA(const char* msg) {
         hidScanInput();
         u32 kDown = hidKeysDown();
         if (kDown & KEY_A) {
-            break; // break in order to return to hbmenu
+            break;
         }
     }
     
@@ -554,8 +555,101 @@ void waitForA(const char* msg) {
         hidScanInput();
          u32 kDown = hidKeysDown();
          if (kDown & KEY_B) {
-            break; // break in order to return to hbmenu
+            break;
         }
     }
 #endif
+}
+
+// Texture loading helper using t3x format files and loading from romfs
+void loadTexture(C3D_Tex* tex, C3D_TexCube* cube, const char* path) {
+    FILE* f = fopen(path, "rb");
+    if (!f) {
+        printf("Texture file not found: %s\n", path);
+        return;
+    }
+    
+    Tex3DS_Texture t3x = Tex3DS_TextureImportStdio(f, tex, cube, true);
+    fclose(f); 
+    if (!t3x) {
+        printf("Texture load failure on %s\n", path);
+        return;
+    }
+    
+    // Set basic options
+    C3D_TexSetFilter(tex, GPU_LINEAR, GPU_LINEAR);
+    C3D_TexSetWrap(tex, GPU_REPEAT, GPU_REPEAT);
+
+    // Delete the t3x object since we don't need it
+    Tex3DS_TextureFree(t3x);
+}
+
+// Set bone mat uniforms from sync value
+// Lerps the matrices for nicer between frame interpolation
+// Assumes loop from last to first frame
+void setBonesFromSync(fbxBasedObject* model, int* boneLocs, float row) {
+    int frameCount = model->frameCount;
+    int boneCount = model->boneCount;
+
+    // Figure out where in the animation we are
+    float animPosFloat = sync_get_val(model->frameSync, row);
+    int animPos = (int)animPosFloat;
+    float animPosRemainder = animPosFloat - (float)animPos;
+    animPos = animPos % frameCount;
+    int animPosNext = (animPos + 1) % frameCount;
+
+    // Set bones
+    C3D_Mtx boneMat;   
+    for(int i = 0; i < boneCount; i++) {
+        Mtx_Identity(&boneMat);
+        for(int j = 0; j < 4 * 3; j++) {
+            int amimIdxA = FBX_FRAME_IDX(animPos, i, j, boneCount);
+            int amimIdxB = FBX_FRAME_IDX(animPosNext, i, j, boneCount);
+            boneMat.m[j] = model->animFrames[amimIdxA] * (1.0 - animPosRemainder) + model->animFrames[amimIdxB] * animPosRemainder;
+        }
+        C3D_FVUnifMtx3x4(GPU_VERTEX_SHADER, boneLocs[i], &boneMat);
+    }
+}
+
+// Load an FBX file
+// Will load the named object from the file, put the vertices in the vbo and the frames in frames, allocating both appropriately.
+fbxBasedObject loadFBXObject(const char* filename, const char* textureFilename, const char* syncPrefix) {
+    FILE* fp = fopen(filename, "rb");
+    if (fp == NULL) {
+        fprintf(stderr, "Error: failed to open file for reading.\n");
+        exit(1);
+    }
+
+    // Read the vertCount and frameCount from the file
+    int32_t vertCount, boneCount, frameCount;
+    fread(&vertCount, sizeof(int32_t), 1, fp);
+    fread(&boneCount, sizeof(int32_t), 1, fp);
+    fread(&frameCount, sizeof(int32_t), 1, fp);
+
+    // Allocate memory for the object
+    fbxBasedObject object;
+    object.vertCount = vertCount;
+    object.boneCount = boneCount;
+    object.frameCount = frameCount;
+    object.vbo = (vertex_rigged*)linearAlloc(sizeof(vertex_rigged) * vertCount);
+    object.animFrames = (float*)malloc(sizeof(float) * frameCount * object.boneCount * 12);
+
+    // Read the vbo from the file
+    fread(object.vbo, sizeof(vertex_rigged), vertCount, fp);
+
+    // Read the animFrames from the file
+    fread(object.animFrames, sizeof(float), frameCount * object.boneCount * 12, fp);
+    fclose(fp);
+
+    // Load sync track
+    char trackName[255];
+    sprintf(trackName, "%s.frame", syncPrefix);
+    object.frameSync = sync_get_track(rocket, trackName);
+
+    // Load texture into VRAM if requested
+    if(textureFilename != NULL) {
+        loadTexture(&object.tex, NULL, textureFilename);
+    }
+    
+    return object;
 }
