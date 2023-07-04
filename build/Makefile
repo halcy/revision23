@@ -47,6 +47,7 @@ CFILES := $(foreach dir,$(SOURCES),$(notdir $(wildcard $(dir)/*.c)))
 PICAFILES := $(foreach dir,$(SOURCES),$(notdir $(wildcard $(dir)/Shaders/*.v.pica)))
 BINFILES := $(foreach dir,$(DATA),$(notdir $(wildcard $(dir)/*.*)))
 PNGFILES := $(foreach dir,$(ASSETS),$(notdir $(wildcard $(dir)/*.png)))
+FBXFILES := $(foreach dir,$(ASSETS),$(notdir $(wildcard $(dir)/*.fbx)))
 
 # Output files
 OUTPUT := $(CURDIR)/$(TARGET)
@@ -54,6 +55,7 @@ OFILES := $(addsuffix .o,$(BINFILES)) \
 	  	  $(PICAFILES:.v.pica=.shbin.o) \
 	  	  $(CFILES:.c=.o)
 ROMFILES_PNG := $(PNGFILES:.png=.bin)
+FBX_SENTINEL = .fbx_rebuild_sentry
 
 # Want GNU extended syntax
 .SUFFIXES:
@@ -78,6 +80,13 @@ ROMFILES_PNG := $(PNGFILES:.png=.bin)
 
 %.ogg: %.ogg
 	./../tooling/convertmusic.sh $< $(ROMFS)/$@ $(BUILD)/music_meta.h
+
+# FBX-to-bin with ufbxconv and 
+$(FBX_SENTINEL): $(FBXFILES)
+	@for fbx in $^; do \
+		../tooling/ufbxconv $$fbx $(ROMFS)/; \
+	done
+	@touch $@
 
 # Basic "binary blob" build rule
 %.bin.o: %.bin
@@ -117,8 +126,9 @@ endef
 
 # Actual binary
 all: $(OUTPUT).3dsx
-$(OUTPUT).3dsx: $(OUTPUT).elf $(OUTPUT).smdh $(ROMFILES_PNG) music.ogg
+$(OUTPUT).3dsx: $(OUTPUT).elf $(OUTPUT).smdh $(ROMFILES_PNG) $(FBX_SENTINEL) music.ogg
 $(OUTPUT).elf: $(OFILES)
 
 clean:
-	rm -fr $(TARGET).3dsx $(OUTPUT).smdh $(TARGET).elf *.o *.h *.lst *.shbin *~ $(ROMFS)/tex_*.bin $(ROMFS)/music.ogg
+	rm -fr $(TARGET).3dsx $(OUTPUT).smdh $(FBX_SENTINEL) $(TARGET).elf *.o *.h *.lst *.shbin *~ $(ROMFS)/tex_*.bin $(ROMFS)/music.ogg $(ROMFS)/*.vbo
+	find . -type f -name "*:Zone.Identifier" -exec rm -f "{}" \;

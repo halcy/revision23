@@ -1,6 +1,5 @@
 /**
- * basic "multiple loadable 3D objects" effect, originally a tunnel, now a platform
- * essentially a bone animation effect, neat for getting stuff from blender
+ * "invites u 2 nordlicht 2023"
  */
 
 #include <stdlib.h>
@@ -58,7 +57,6 @@ void loadTexture(C3D_Tex* tex, C3D_TexCube* cube, const char* path) {
 void setBonesFromSync(fbxBasedObject* model, float row) {
     int frameCount = model->frameCount;
     int boneCount = model->boneCount;
-    printf("%d %d\n", frameCount, boneCount);
 
     // Figure out where in the animation we are
     float animPosFloat = sync_get_val(model->frameSync, row);
@@ -110,10 +108,6 @@ fbxBasedObject loadFBXObject(const char* filename, const char* textureFilename, 
     fread(object.animFrames, sizeof(float), frameCount * object.boneCount * 12, fp);
     fclose(fp);
 
-    for(int i = 0; i < object.vertCount; i++) {
-        printf("%f %f %f\n", object.vbo[i].position[0], object.vbo[i].position[1], object.vbo[i].position[2]);
-    }
-
     // Load sync track
     char trackName[255];
     sprintf(trackName, "%s.frame", syncPrefix);
@@ -127,7 +121,7 @@ fbxBasedObject loadFBXObject(const char* filename, const char* textureFilename, 
     return object;
 }
 
-void effectStreetInit() {
+void effectIntroInit() {
     // Prep general info: Shader (precompiled in main for important ceremonial reasons)
     C3D_BindProgram(&shaderProgramBones);
 
@@ -143,18 +137,14 @@ void effectStreetInit() {
     }
 
     // Load a model
-    printf("try load\n");
-    modelCar = loadFBXObject("romfs:/car.vbo", "romfs:/tex_platform.bin", "street.car");
-    modelStreet = loadFBXObject("romfs:/street.vbo", "romfs:/tex_platform.bin", "street.street");
-    printf("did load\n");
+    modelCar = loadFBXObject("romfs:/cube.vbo", "romfs:/tex_testcube.bin", "street.car");
+    modelStreet = loadFBXObject("romfs:/street.vbo", "romfs:/tex_3ds_test.bin", "street.street");
 }
 
 // TODO: Split out shade setup
 void drawModel(fbxBasedObject* model, float row) {
     // Update bone mats
-    printf("set bones\n");
     setBonesFromSync(model, row);
-    printf("got bones\n");
 
     // Set up attribute info
     C3D_AttrInfo* attrInfo = C3D_GetAttrInfo();
@@ -232,7 +222,7 @@ void drawModel(fbxBasedObject* model, float row) {
     C3D_DrawArrays(GPU_TRIANGLES, 0, model->vertCount);
 }
 
-void effectStreetRender(C3D_RenderTarget* targetLeft, C3D_RenderTarget* targetRight, float row, float iod) {
+void effectIntroRender(C3D_RenderTarget* targetLeft, C3D_RenderTarget* targetRight, float row, float iod) {
     // Frame starts (TODO pull out?)
     C3D_FrameBegin(C3D_FRAME_SYNCDRAW);
 
@@ -240,8 +230,12 @@ void effectStreetRender(C3D_RenderTarget* targetLeft, C3D_RenderTarget* targetRi
     C3D_Mtx modelview;
     Mtx_Identity(&modelview);
     Mtx_Translate(&modelview, 0.0, -1.0, -4.0, true);
-    Mtx_RotateZ(&modelview, M_PI, true);
-    Mtx_RotateY(&modelview, row * 0.1, true);
+    Mtx_RotateY(&modelview, M_PI / 2, true);
+    //Mtx_RotateY(&modelview, M_PI, true);
+    //Mtx_RotateY(&modelview, M_PI, true);
+    /*Mtx_RotateZ(&modelview, M_PI, true);
+    /*Mtx_RotateZ(&modelview, M_PI, true);*/
+    //Mtx_RotateY(&modelview, row * 0.1, true);
     C3D_FVUnifMtx4x4(GPU_VERTEX_SHADER, uLocModelview,  &modelview);
 
     // Left eye
@@ -252,9 +246,8 @@ void effectStreetRender(C3D_RenderTarget* targetLeft, C3D_RenderTarget* targetRi
     C3D_FVUnifMtx4x4(GPU_VERTEX_SHADER, uLocProjection, &projection);
 
     // Dispatch drawcalls
-    //waitForA("Dispatching");
     drawModel(&modelCar, row);
-    drawModel(&modelStreet, row);
+    //drawModel(&modelStreet, row);
 
     // Do fading
     //fade();
@@ -268,8 +261,8 @@ void effectStreetRender(C3D_RenderTarget* targetLeft, C3D_RenderTarget* targetRi
         C3D_FVUnifMtx4x4(GPU_VERTEX_SHADER, uLocProjection, &projection);
 
         // Dispatch drawcalls
-        drawModel(&modelCar, row);
-        drawModel(&modelStreet, row);
+        //drawModel(&modelCar, row);
+        //drawModel(&modelStreet, row);
 
         // Perform fading
         //fade();
@@ -277,8 +270,9 @@ void effectStreetRender(C3D_RenderTarget* targetLeft, C3D_RenderTarget* targetRi
 
     // Swap
     C3D_FrameEnd(0);
+
 }
 
-void effectStreetExit() {
+void effectIntroExit() {
     // TODO free ressources here okay
 }

@@ -40,6 +40,7 @@ u8* music_bin;
 #define SONG_BPS (SONG_BPM / 60.0)
 #define SONG_SPS 32000
 #define SONG_SPB (SONG_SPS / SONG_BPS)
+#define MUSIC_LEN_SEC 0.5
 #define MUSIC_SIZE ((size_t)(MUSIC_LEN_SEC * CHANNELS * SONG_SPS * sizeof(int16_t)))
 
 #define ROWS_PER_BEAT 8
@@ -188,9 +189,9 @@ typedef struct effect {
 } effect;
 
 // Externs for effects
-extern void effectStreetInit();
-extern void effectStreetRender(C3D_RenderTarget* targetLeft, C3D_RenderTarget* targetRight, float row, float iod);
-extern void effectStreetExit();
+extern void effectIntroInit();
+extern void effectIntroRender(C3D_RenderTarget* targetLeft, C3D_RenderTarget* targetRight, float row, float iod);
+extern void effectIntroExit();
 
 int main() {
     bool DUMPFRAMES = false;
@@ -202,14 +203,14 @@ int main() {
     effect effect_list[EFFECT_MAX];
     
     // The tunnel-actually-platform effect currently will NOT exist cleanly. (TODO FIXME? will be replaced anyways)
-    effect_list[0].init = effectStreetInit;
-    effect_list[0].render = effectStreetRender;
-    effect_list[0].exit = effectStreetExit;
+    effect_list[0].init = effectIntroInit;
+    effect_list[0].render = effectIntroRender;
+    effect_list[0].exit = effectIntroExit;
     
     // Actually the effects are just kind of broken generally. TODO: Fix
-    effect_list[1].init = effectStreetInit;
-    effect_list[1].render = effectStreetRender;
-    effect_list[1].exit = effectStreetExit;
+    effect_list[1].init = effectIntroInit;
+    effect_list[1].render = effectIntroRender;
+    effect_list[1].exit = effectIntroExit;
 
     // Initialize graphics
     gfxInit(GSP_RGBA8_OES, GSP_BGR8_OES, false);

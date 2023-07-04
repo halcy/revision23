@@ -6,8 +6,12 @@ all: upload
 
 clean:
 	$(MAKE) -C build clean
+	rm tooling/ufbxconv
 
-binary:
+tooling/ufbxconv:
+	$(MAKE) -C tooling
+
+binary: tooling/ufbxconv
 	$(MAKE) -C build all
 	cp build/*.3dsx .
 
