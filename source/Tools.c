@@ -611,6 +611,28 @@ void setBonesFromSync(fbxBasedObject* model, int* boneLocs, float row) {
     }
 }
 
+// Get a matrix from sync value and bone nb
+// good for parenting other crap onto a bone, like the camera
+void getBoneMat(fbxBasedObject* model, float row, C3D_Mtx* boneMat, int boneNb) {
+    int frameCount = model->frameCount;
+    int boneCount = model->boneCount;
+
+    // Figure out where in the animation we are
+    float animPosFloat = sync_get_val(model->frameSync, row);
+    int animPos = (int)animPosFloat;
+    float animPosRemainder = animPosFloat - (float)animPos;
+    animPos = animPos % frameCount;
+    int animPosNext = (animPos + 1) % frameCount;
+
+    // Set bones
+    Mtx_Identity(boneMat);
+    for(int j = 0; j < 4 * 3; j++) {
+        int amimIdxA = FBX_FRAME_IDX(animPos, boneNb, j, boneCount);
+        int amimIdxB = FBX_FRAME_IDX(animPosNext, boneNb, j, boneCount);
+        boneMat->m[j] = model->animFrames[amimIdxA] * (1.0 - animPosRemainder) + model->animFrames[amimIdxB] * animPosRemainder;
+    }
+}
+
 // Load an FBX file
 // Will load the named object from the file, put the vertices in the vbo and the frames in frames, allocating both appropriately.
 fbxBasedObject loadFBXObject(const char* filename, const char* textureFilename, const char* syncPrefix) {

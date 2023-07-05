@@ -5,7 +5,7 @@
 #define TOOLS_BASICS_ONLY
 #include "Tools.h"
 
-// #define DEBUG
+//#define DEBUG
 
 fbxBasedObject loadFBXObject(const char* filename, const char* objectName) {
     // Output object

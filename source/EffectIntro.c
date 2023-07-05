@@ -28,6 +28,8 @@ static int uLocBone[21];
 fbxBasedObject modelTextA;
 fbxBasedObject modelTextB;
 fbxBasedObject modelTextC;
+fbxBasedObject modelEnv;
+fbxBasedObject camProxy;
 
 void effectIntroInit() {
     // Prep general info: Shader (precompiled in main for important ceremonial reasons)
@@ -48,6 +50,8 @@ void effectIntroInit() {
     modelTextA = loadFBXObject("romfs:/obj_introtext_svatg.vbo", NULL, "intro.text");
     modelTextB = loadFBXObject("romfs:/obj_introtext_inviteyouto.vbo", NULL, "intro.text");
     modelTextC = loadFBXObject("romfs:/obj_introtext_nordlicht2023.vbo", NULL, "intro.text");
+    camProxy = loadFBXObject("romfs:/obj_introtext_cam_proxy.vbo", NULL, "intro.cam");
+    modelEnv = loadFBXObject("romfs:/obj_introtext_env.vbo", NULL, "intro.env");
 }
 
 // TODO: Split out shade setup
@@ -136,23 +140,47 @@ void effectIntroRender(C3D_RenderTarget* targetLeft, C3D_RenderTarget* targetRig
     C3D_FrameBegin(C3D_FRAME_SYNCDRAW);
 
     // Send modelview
+    C3D_Mtx baseview;
+    Mtx_Identity(&baseview);
+    Mtx_RotateZ(&baseview, M_PI, true);
+    Mtx_RotateX(&baseview, -M_PI / 2, true);
+    Mtx_RotateY(&baseview, M_PI, true);
+
+    C3D_Mtx camMat;
+    getBoneMat(&camProxy, row, &camMat, 3);
+    Mtx_Transpose(&camMat);
+    Mtx_Inverse(&camMat);
+    Mtx_Transpose(&camMat);
+
     C3D_Mtx modelview;
-    Mtx_Identity(&modelview);
-    Mtx_Translate(&modelview, 0.0, -1.0, -4.0, true);
-    Mtx_RotateY(&modelview, M_PI / 2, true);
+    Mtx_Multiply(&modelview, &baseview, &camMat);
+
+    // Mtx_Identity(&modelview);
+    // Mtx_Translate(&modelview, 0.0, -1.0, -4.0, true);
+    // Mtx_RotateY(&modelview, M_PI / 2, true);
+
+    //Mtx_Inverse(&modelview);
+    // print matrix
+    printf("modelview:\n");
+    for(int j = 0; j < 4 * 3; j++) {
+        printf("%.2f ", modelview.m[j]);
+        if(j % 4 == 3) printf("\n");
+    }
+    printf("\n");
     C3D_FVUnifMtx4x4(GPU_VERTEX_SHADER, uLocModelview,  &modelview);
 
     // Left eye
     C3D_FrameDrawOn(targetLeft);
     C3D_RenderTargetClear(targetLeft, C3D_CLEAR_ALL, 0xff0000FF, 0);
     
-    Mtx_PerspStereoTilt(&projection, 70.0f*M_PI/180.0f, 300.0f/240.0f, 0.01f, 6000.0f, -iod,  7.0f, false);
+    Mtx_PerspStereoTilt(&projection, 20.0f*M_PI/180.0f, 400.0f/240.0f, 0.01f, 6000.0f, -iod,  7.0f, false);
     C3D_FVUnifMtx4x4(GPU_VERTEX_SHADER, uLocProjection, &projection);
 
     // Dispatch drawcalls
     drawModel(&modelTextA, row);
     drawModel(&modelTextB, row);
     drawModel(&modelTextC, row);
+    drawModel(&modelEnv, row);
 
     // Do fading
     //fade();
@@ -162,13 +190,14 @@ void effectIntroRender(C3D_RenderTarget* targetLeft, C3D_RenderTarget* targetRig
         C3D_FrameDrawOn(targetRight);
         C3D_RenderTargetClear(targetRight, C3D_CLEAR_ALL, 0x00ff00FF, 0); 
         
-        Mtx_PerspStereoTilt(&projection, 70.0f*M_PI/180.0f, 300.0f/240.0f, 0.01f, 6000.0f, iod, 7.0f, false);
+        Mtx_PerspStereoTilt(&projection, 20.0f*M_PI/180.0f, 400.0f/240.0f, 0.01f, 6000.0f, iod, 7.0f, false);
         C3D_FVUnifMtx4x4(GPU_VERTEX_SHADER, uLocProjection, &projection);
 
         // Dispatch drawcalls
         drawModel(&modelTextA, row);
         drawModel(&modelTextB, row);
         drawModel(&modelTextC, row);
+        drawModel(&modelEnv, row);
 
         // Perform fading
         //fade();

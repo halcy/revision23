@@ -364,6 +364,7 @@ extern void waitForA(const char* msg);
 void loadTexture(C3D_Tex* tex, C3D_TexCube* cube, const char* path);
 fbxBasedObject loadFBXObject(const char* filename, const char* textureFilename, const char* syncPrefix);
 void setBonesFromSync(fbxBasedObject* model, int* boneLocs, float row);
+void getBoneMat(fbxBasedObject* model, float row, C3D_Mtx* boneMat, int boneNb);
 
 #endif
 #endif
