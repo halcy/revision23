@@ -18,10 +18,6 @@ float fadeVal;
 #include "music_meta.h"
 u8* music_bin;
 
-// "ugh I dopn't want to wait while debugging"
-#undef MUSIC_LEN_SEC
-#define MUSIC_LEN_SEC 15.0
-
 // For streaming (WIP/TODO)
 // u8* music_bin_play;
 // u32 music_bin_play_block;
@@ -256,6 +252,8 @@ int main() {
     }
     ov_clear(&vorbis);
     fclose(fp);
+
+    waitForA("Loaded vorbis, press A -> B to continue");
 
     printf("Demobeginn imminent.\n");
 
