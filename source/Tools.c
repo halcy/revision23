@@ -559,7 +559,7 @@ void waitForA(const char* msg) {
         }
     }
 #endif
-}
+} 
 
 // Texture loading helper using t3x format files and loading from romfs
 void loadTexture(C3D_Tex* tex, C3D_TexCube* cube, const char* path) {
@@ -569,14 +569,14 @@ void loadTexture(C3D_Tex* tex, C3D_TexCube* cube, const char* path) {
         return;
     }
     
-    Tex3DS_Texture t3x = Tex3DS_TextureImportStdio(f, tex, cube, true);
+    Tex3DS_Texture t3x = Tex3DS_TextureImportStdio(f, tex, cube, true); 
     fclose(f); 
     if (!t3x) {
         printf("Texture load failure on %s\n", path);
         return;
     }
     
-    // Set basic options
+    // Set basic options 
     C3D_TexSetFilter(tex, GPU_LINEAR, GPU_LINEAR);
     C3D_TexSetWrap(tex, GPU_REPEAT, GPU_REPEAT);
 
@@ -647,7 +647,8 @@ fbxBasedObject loadFBXObject(const char* filename, const char* textureFilename, 
     fread(&vertCount, sizeof(int32_t), 1, fp);
     fread(&boneCount, sizeof(int32_t), 1, fp);
     fread(&frameCount, sizeof(int32_t), 1, fp);
-
+    printf("Loaded %d verts, %d bones, %d frames\n", vertCount, boneCount, frameCount);
+    
     // Allocate memory for the object
     fbxBasedObject object;
     object.vertCount = vertCount;

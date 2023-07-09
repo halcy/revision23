@@ -124,7 +124,7 @@ fbxBasedObject loadFBXObject(const char* filename, const char* objectName) {
                     }
 
                     // Set the vertex, with y and z swapped and the original y negated because it's illegal for a coordinate system
-                    // used by a 3D engine to be the same as the one used by a 3D modelling tool
+                    // used by a 3D engine to be the same as the one used by a 3D modelling tool (sike, we're doing it in thte matrix now)
                     objectNew.vbo[setVertIdx].position[0] = pos.x;
                     objectNew.vbo[setVertIdx].position[1] = pos.y;
                     objectNew.vbo[setVertIdx].position[2] = pos.z;
@@ -156,9 +156,9 @@ fbxBasedObject loadFBXObject(const char* filename, const char* objectName) {
                 #endif
                 ufbx_anim_stack* anim_stack = scene->anim_stacks.data[0];
 
-                // We assume 60fps
+                // We sample at 60fps
                 float frameDur = 1.0 / 60.0;
-                size_t frameCount = (size_t)((anim_stack->anim.time_end - anim_stack->anim.time_begin) * 60.0 + 0.5);
+                size_t frameCount = (size_t)((anim_stack->anim.time_end - anim_stack->anim.time_begin) / frameDur + 0.5);
                 size_t boneCount = skin->clusters.count;
                 #ifdef DEBUG
                 printf("  * frame count: %ld\n", frameCount);
@@ -174,13 +174,13 @@ fbxBasedObject loadFBXObject(const char* filename, const char* objectName) {
                 for(size_t frame = 0; frame < frameCount; frame++) {
                     // Get every bones transform for the frame
                     for(size_t boneIdx = 0; boneIdx < boneCount; boneIdx++) {
-                        ufbx_node* bone = skin->clusters.data[boneIdx]->bone_node;
+                        ufbx_skin_cluster* cluster = skin->clusters.data[boneIdx];
+                        ufbx_node* bone = cluster->bone_node;
                         float frameTime = anim_stack->anim.time_begin + frame * frameDur;
                         ufbx_transform transform = ufbx_evaluate_transform(&anim_stack->anim, bone, frameTime);
                         ufbx_matrix transformMatLocal = ufbx_transform_to_matrix(&transform);
-                        ufbx_matrix transformMat = ufbx_matrix_mul(&transformMatLocal, &node->node_to_world);
-                        
-                        // Print the original transform matrix
+                        ufbx_matrix transformMat = ufbx_matrix_mul(&transformMatLocal, &cluster->geometry_to_bone);
+
                         #ifdef DEBUG
                         printf("%f %f %f\n%f %f %f\n%f %f %f\n%f %f %f\n\n",
                             transformMat.v[0],
@@ -199,16 +199,19 @@ fbxBasedObject loadFBXObject(const char* filename, const char* objectName) {
                         #endif
 
                         // Transpose and scale
-                        // why scale? I actually have no idea. numerical stability / floating point bullshit?
+                        // why scale? I guess meters to cm?
                         ufbx_matrix tempMat;
                         for (int i = 0; i < 4; ++i) {
                             for (int j = 0; j < 3; ++j) {
                                 int idx_in = i * 3 + j;
                                 int idx_out = j * 4 + i;
                                 float scale = 1.0;
-                                if (i != 3) {
+                                /*if (i != 3) {
+                                    scale = 0.0001;
+                                }*/
+                                /*if(i == 3) {
                                     scale = 0.01;
-                                }
+                                }*/
                                 tempMat.v[idx_out] = transformMat.v[idx_in] * scale;
                             }
                         }

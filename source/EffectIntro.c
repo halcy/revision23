@@ -10,12 +10,12 @@
 #include <math.h>
 
 #include "Tools.h"
-
+ 
 // Global data: Matrices
 static int uLocProjection;
-static int uLocModelview;
+static int uLocModelview; 
 static C3D_Mtx projection;
-
+ 
 // Global data: Lighting
 static C3D_LightEnv lightEnv;
 static C3D_Light light;
@@ -29,13 +29,14 @@ fbxBasedObject modelTextA;
 fbxBasedObject modelTextB;
 fbxBasedObject modelTextC;
 fbxBasedObject modelEnv;
+fbxBasedObject modelTrain;
 fbxBasedObject camProxy;
 
 void effectIntroInit() {
     // Prep general info: Shader (precompiled in main for important ceremonial reasons)
     C3D_BindProgram(&shaderProgramBones);
 
-    // Prep general info: Uniform locs
+    // Prep general info: Uniform locs 
     uLocProjection = shaderInstanceGetUniformLocation(shaderProgramBones.vertexShader, "projection");
     uLocModelview = shaderInstanceGetUniformLocation(shaderProgramBones.vertexShader, "modelView");
     
@@ -52,6 +53,7 @@ void effectIntroInit() {
     modelTextC = loadFBXObject("romfs:/obj_introtext_nordlicht2023.vbo", NULL, "intro.text");
     camProxy = loadFBXObject("romfs:/obj_introtext_cam_proxy.vbo", NULL, "intro.cam");
     modelEnv = loadFBXObject("romfs:/obj_introtext_env.vbo", NULL, "intro.env");
+    modelTrain = loadFBXObject("romfs:/obj_introtext_train.vbo", NULL, "intro.train");
 }
 
 // TODO: Split out shade setup
@@ -115,7 +117,7 @@ void drawModel(fbxBasedObject* model, float row) {
     C3D_TexEnvOpRgb(env, 0, 0, 0);
     C3D_TexEnvFunc(env, C3D_RGB, GPU_MODULATE);
     
-    env = C3D_GetTexEnv(1);
+    env = C3D_GetTexEnv(1); 
     C3D_TexEnvInit(env);
     C3D_TexEnvSrc(env, C3D_RGB, GPU_FRAGMENT_SECONDARY_COLOR, GPU_PREVIOUS, 0);
     C3D_TexEnvOpRgb(env, GPU_TEVOP_RGB_SRC_ALPHA , 0, 0);
@@ -124,53 +126,47 @@ void drawModel(fbxBasedObject* model, float row) {
     env = C3D_GetTexEnv(2);
     C3D_TexEnvInit(env);
     C3D_TexEnvSrc(env, C3D_Alpha, GPU_CONSTANT, GPU_PREVIOUS, 0);
-    C3D_TexEnvFunc(env, C3D_Alpha, GPU_REPLACE);
+    C3D_TexEnvFunc(env, C3D_Alpha, GPU_REPLACE);  
 
-    // GPU state for normal drawing with transparency
+    // GPU state for normal drawing with transparency 
     C3D_DepthTest(true, GPU_GEQUAL, GPU_WRITE_ALL);
-    C3D_CullFace(GPU_CULL_BACK_CCW);
+    //C3D_CullFace(GPU_CULL_BACK_CCW);
+    C3D_CullFace(GPU_CULL_NONE); 
     C3D_AlphaBlend(GPU_BLEND_ADD, GPU_BLEND_ADD, GPU_SRC_ALPHA, GPU_ONE_MINUS_SRC_ALPHA, GPU_SRC_ALPHA, GPU_ONE_MINUS_SRC_ALPHA);
-
+ 
     // Actual drawcall
     C3D_DrawArrays(GPU_TRIANGLES, 0, model->vertCount);
 }
 
 void effectIntroRender(C3D_RenderTarget* targetLeft, C3D_RenderTarget* targetRight, float row, float iod) {
-    // Frame starts (TODO pull out?)
+    // Frame starts (TODO pull out?)   
     C3D_FrameBegin(C3D_FRAME_SYNCDRAW);
-
-    // Send modelview
+ 
+    // Send modelview 
     C3D_Mtx baseview;
     Mtx_Identity(&baseview);
     Mtx_RotateZ(&baseview, M_PI, true);
     Mtx_RotateX(&baseview, -M_PI / 2, true);
     Mtx_RotateY(&baseview, M_PI, true);
-
+  
     C3D_Mtx camMat;
     getBoneMat(&camProxy, row, &camMat, 3);
-    Mtx_Transpose(&camMat);
     Mtx_Inverse(&camMat);
-    Mtx_Transpose(&camMat);
 
     C3D_Mtx modelview;
     Mtx_Multiply(&modelview, &baseview, &camMat);
+    //Mtx_Scale(&modelview, 0.01, 0.01, 0.01);
 
-    // Mtx_Identity(&modelview);
-    // Mtx_Translate(&modelview, 0.0, -1.0, -4.0, true);
-    // Mtx_RotateY(&modelview, M_PI / 2, true);
 
-    //Mtx_Inverse(&modelview);
-    // print matrix
-    printf("modelview:\n");
-    for(int j = 0; j < 4 * 3; j++) {
-        printf("%.2f ", modelview.m[j]);
-        if(j % 4 == 3) printf("\n");
-    }
-    printf("\n");
+    //Mtx_Identity(&modelview);
+    //Mtx_Translate(&modelview, 0.0, -1.0, -40.0, true);
+    //Mtx_RotateX(&modelview, M_PI, true);
+    //Mtx_RotateY(&modelview, M_PI / 2, true);
+
     C3D_FVUnifMtx4x4(GPU_VERTEX_SHADER, uLocModelview,  &modelview);
-
-    // Left eye
-    C3D_FrameDrawOn(targetLeft);
+ 
+    // Left eye 
+    C3D_FrameDrawOn(targetLeft);  
     C3D_RenderTargetClear(targetLeft, C3D_CLEAR_ALL, 0xff0000FF, 0);
     
     Mtx_PerspStereoTilt(&projection, 20.0f*M_PI/180.0f, 400.0f/240.0f, 0.01f, 6000.0f, -iod,  7.0f, false);
@@ -181,6 +177,7 @@ void effectIntroRender(C3D_RenderTarget* targetLeft, C3D_RenderTarget* targetRig
     drawModel(&modelTextB, row);
     drawModel(&modelTextC, row);
     drawModel(&modelEnv, row);
+    drawModel(&modelTrain, row);
 
     // Do fading
     //fade();
@@ -198,10 +195,11 @@ void effectIntroRender(C3D_RenderTarget* targetLeft, C3D_RenderTarget* targetRig
         drawModel(&modelTextB, row);
         drawModel(&modelTextC, row);
         drawModel(&modelEnv, row);
-
+        drawModel(&modelTrain, row);
+        
         // Perform fading
         //fade();
-    }
+    } 
 
     // Swap
     C3D_FrameEnd(0);
